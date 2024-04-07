@@ -27,7 +27,8 @@
 			- [Bluetooth](#bluetooth)
 		- [Wayland + Sway](#wayland--sway)
 		- [Additional graphical/desktop applications](#additional-graphicaldesktop-applications)
-	- [ASUS-specific customizations](#asus-specific-customizations)
+	- [Flow X16 specific customizations](#flow-x16-specific-customizations)
+		- [Intel](#intel)
 		- [Install ASUS tools](#install-asus-tools)
 		- [Nvidia](#nvidia)
 	- [Setup automatic snapshots for pacman](#setup-automatic-snapshots-for-pacman)
@@ -300,7 +301,8 @@ pacman -Syu
 
 ```sh
 pacman -S acpid dbus sudo docker openssh picocom rsync pass python-pip rustup git \
-	ttf-dejavu ttf-hack ttf-font-awesome noto-fonts-cjk wireguard-tools bash-completion
+	ttf-dejavu ttf-hack ttf-font-awesome ttf-nerd-fonts-symbols noto-fonts-cjk \
+    zip unzip ripgrep wireguard-tools bash-completion
 ```
 
 Enable and start `acpid`:
@@ -378,13 +380,42 @@ Enable the `seatd` service:
 systemctl enable --now seatd
 ```
 
+If you want screen rotation handling, you can install iio-sensormanually compile and install [iio-sway](https://github.com/okeri/iio-sway/tree/master):
+
+```sh
+pacman -S iio-sensor-proxy meson
+git clone https://github.com/okeri/iio-sway.git
+cd iio-sway
+meson setup build
+cd build
+meson install
+# Remove meson once done (optional)
+sudo pacman -Rns meson
+```
+
+You can then add, `exec iio-sway` to the top of your sway config.
+
 ### Additional graphical/desktop applications
 
 ```sh
-pacman -S firefox alacritty imv mpv code
+pacman -S firefox alacritty imv mpv
 ```
 
-## ASUS-specific customizations
+## Flow X16 specific customizations
+
+### Intel
+
+Install the `mesa` driver (likely already installed as a dependency of other packages):
+
+```sh
+pacman -S mesa
+```
+
+Enable [GuC/HuC firmware loading](https://wiki.archlinux.org/title/intel_graphics#Enable_GuC_/_HuC_firmware_loading), create the file `/etc/modprobe.d/i915.conf` with contents:
+
+```sh
+/etc/modprobe.d/i915.conf
+```
 
 ### Install ASUS tools
 
@@ -392,10 +423,12 @@ You can install these tools by following official asus-linux [Arch Setup Guide](
 or just use an AUR helper and get them from the AUR repos:
 
 ```sh
-paru -S asusctl rog-control-center supergfxctl
+paru -S asusctl
 ```
 
-Enable them:
+You can also install `rog-control-center` and `supergfxctl`. I didn't.
+
+Enable services (`supergfxd` only if you installs `supergfxctl`):
 ```sh
 systemctl enable --now power-profiles-daemon supergfxd
 ```
