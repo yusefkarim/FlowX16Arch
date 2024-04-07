@@ -18,14 +18,14 @@ TODELETE=$(/usr/bin/ls /.snapshots -I STABLE | sort | head -n 1)
 if [[ $COUNT -eq 5 ]]
 then
 $BTRFS sub delete /.snapshots/$TODELETE
-$RM -f /boot/vmlinuz-linux-g14-$TODELETE
-$RM -f /boot/amd-ucode-$TODELETE.img
-$RM -f /boot/initramfs-linux-g14-$TODELETE.img
-$RM -f /boot/loader/entries/arch-g14-$TODELETE.conf
+$RM -f /boot/vmlinuz-linux-$TODELETE
+$RM -f /boot/intel-ucode-$TODELETE.img
+$RM -f /boot/initramfs-linux-$TODELETE.img
+$RM -f /boot/loader/entries/arch-$TODELETE.conf
 fi
 
 # Get today's date in UTC +5 time, in the format YYYY-MM-DDTHH:MM:SS
-TODAY=$(TZ="Asia/Karachi" date +"%Y-%m-%dT%H:%M:%S" | sed 's/:/_/g')
+TODAY=$(TZ="America/Toronto" date +"%Y-%m-%dT%H:%M:%S" | sed 's/:/_/g')
 
 # Take a snapshot of the existing STABLE snapshot and delete the existing STABLE snapshot
 $BTRFS sub snap /.snapshots/STABLE /.snapshots/$TODAY
@@ -55,19 +55,19 @@ $SED -i "s|subvol=/@\t|subvol=/@snapshots/$TODAY |" /.snapshots/$TODAY/etc/fstab
 $SED -i "s|subvol=/@ |subvol=/@snapshots/$TODAY |" /.snapshots/$TODAY/etc/fstab
 
 # Create the bootloader entry for the old stable snapshot
-$CP /boot/loader/entries/arch-g14-stable.conf /boot/loader/entries/arch-g14-$TODAY.conf
-$SED -i "s|rootflags=subvol=@snapshots/STABLE|rootflags=subvol=@snapshots/$TODAY|" /boot/loader/entries/arch-g14-$TODAY.conf
-$SED -i "s|title Arch Linux (G14) Stable|title Arch Linux (G14) $TODAY|" /boot/loader/entries/arch-g14-$TODAY.conf
-$SED -i "s|linux /vmlinuz-linux-g14-stable|linux /vmlinuz-linux-g14-$TODAY|" /boot/loader/entries/arch-g14-$TODAY.conf
-$SED -i "s|initrd /amd-ucode-stable.img|initrd /amd-ucode-$TODAY.img|" /boot/loader/entries/arch-g14-$TODAY.conf
-$SED -i "s|initrd /initramfs-linux-g14-stable.img|initrd /initramfs-linux-g14-$TODAY.img|" /boot/loader/entries/arch-g14-$TODAY.conf
+$CP /boot/loader/entries/arch.conf /boot/loader/entries/arch-$TODAY.conf
+$SED -i "s|rootflags=subvol=@snapshots/STABLE|rootflags=subvol=@snapshots/$TODAY|" /boot/loader/entries/arch-$TODAY.conf
+$SED -i "s|title Arch Linux Stable|title Arch Linux $TODAY|" /boot/loader/entries/arch-$TODAY.conf
+$SED -i "s|linux /vmlinuz-linux-stable|linux /vmlinuz-linux-$TODAY|" /boot/loader/entries/arch-$TODAY.conf
+$SED -i "s|initrd /intel-ucode-stable.img|initrd /intel-ucode-$TODAY.img|" /boot/loader/entries/arch-$TODAY.conf
+$SED -i "s|initrd /initramfs-linux-stable.img|initrd /initramfs-linux-$TODAY.img|" /boot/loader/entries/arch-$TODAY.conf
 
 # Copy kernel and initramfs for old stable snapshot
-$CP /boot/vmlinuz-linux-g14-stable /boot/vmlinuz-linux-g14-$TODAY
-$CP /boot/amd-ucode-stable.img /boot/amd-ucode-$TODAY.img
-$CP /boot/initramfs-linux-g14-stable.img /boot/initramfs-linux-g14-$TODAY.img
+$CP /boot/vmlinuz-linux-stable /boot/vmlinuz-linux-$TODAY
+$CP /boot/intel-ucode-stable.img /boot/intel-ucode-$TODAY.img
+$CP /boot/initramfs-linux-stable.img /boot/initramfs-linux-$TODAY.img
 
 # Copy current kernel and initramfs to stable snapshot
-$CP /boot/vmlinuz-linux-g14 /boot/vmlinuz-linux-stable
-$CP /boot/amd-ucode.img /boot/amd-ucode-stable.img
-$CP /boot/initramfs-linux-g14.img /boot/initramfs-linux-g14-stable.img
+$CP /boot/vmlinuz-linux /boot/vmlinuz-linux-stable
+$CP /boot/intel-ucode.img /boot/intel-ucode-stable.img
+$CP /boot/initramfs-linux.img /boot/initramfs-linux-stable.img
