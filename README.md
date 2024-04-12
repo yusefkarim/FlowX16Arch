@@ -15,22 +15,21 @@
 		- [Blacklist Nouveau](#blacklist-nouveau)
 		- [Leave chroot and reboot](#leave-chroot-and-reboot)
 	- [Fine-tuning](#fine-tuning)
-		- [Enable essential systemd units](#enable-essential-systemd-units)
 		- [Setup networking](#setup-networking)
 		- [Connect to WiFi](#connect-to-wifi)
 		- [Install packages](#install-packages)
 		- [Install an AUR helper (paru)](#install-an-aur-helper-paru)
 		- [Create a new user](#create-a-new-user)
+	- [Flow X16 specific customizations](#flow-x16-specific-customizations)
+		- [Intel](#intel)
+		- [NVIDIA](#nvidia)
+		- [ASUS tools](#asus-tools)
 	- [Install audio and graphical cruft](#install-audio-and-graphical-cruft)
 		- [Audio](#audio)
 			- [Pipewire](#pipewire)
 			- [Bluetooth](#bluetooth)
 		- [Wayland + Sway](#wayland--sway)
 		- [Additional graphical/desktop applications](#additional-graphicaldesktop-applications)
-	- [Flow X16 specific customizations](#flow-x16-specific-customizations)
-		- [Intel](#intel)
-		- [Install ASUS tools](#install-asus-tools)
-		- [Nvidia](#nvidia)
 	- [Setup automatic snapshots for pacman](#setup-automatic-snapshots-for-pacman)
 
 # Arch Linux on Asus ROG Flow X16 (GV601VU) 
@@ -141,7 +140,7 @@ swapon /mnt/swap/swapfile
 ### Install the system using pacstrap
 
 ```sh
-pacstrap /mnt base base-devel linux linux-firmware iwd btrfs-progs man-db neovim curl python intel-ucode
+pacstrap /mnt base base-devel linux linux-firmware iwd btrfs-progs man-db neovim curl ldns python intel-ucode
 ```
 
 After this, generate the filesystem table using 
@@ -234,16 +233,21 @@ and reboot the system.
 
 ## Fine-tuning
 
-After a successful reboot, we will perform some necessary initial setup.
+After a successful reboot above, we will perform some necessary initial setup.
 
-### Enable essential systemd units
-To connect to WiFi using `nmcli`, enable the network manager
+### Setup networking
+
+Enable essential systemd units
 
 ```sh
 systemctl enable --now iwd systemd-networkd systemd-resolved systemd-timesyncd
 ```
 
-### Setup networking
+Make sure the systemd stub `resolv.conf` file is used:
+
+```sh
+sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+```
 
 Create the following systemd-networkd files:
 
@@ -337,6 +341,96 @@ Enable root access for the user by running the command below and uncommenting th
 EDITOR=nvim visudo
 ```
 
+## Flow X16 specific customizations
+
+### Intel
+
+Install the `mesa` driver (likely already installed as a dependency of other packages):
+
+```sh
+pacman -S mesa
+```
+
+Enable [GuC/HuC firmware loading](https://wiki.archlinux.org/title/intel_graphics#Enable_GuC_/_HuC_firmware_loading), create the file `/etc/modprobe.d/i915.conf` with contents:
+
+```sh
+/etc/modprobe.d/i915.conf
+```
+
+### NVIDIA
+Install the following packages
+
+```sh
+sudo pacman -S nvidia-dkms acpi_call linux-headers
+```
+
+Add NVIDIA-specific kernel options to systemd-boot:
+
+`/boot/loader/entries/arch.conf`
+```sh
+...
+options ... nvidia_drm.modeset=1 nvidia.NVreg_PreserveVideoMemoryAllocations=1
+```
+
+Add NVIDIA-specific kernel modules to the `MODULES` section of `mkinitcpio.conf`:
+
+`/etc/mkinitcpio.conf`
+```sh
+...
+MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+...
+```
+
+Generate a new `initrd`:
+
+```sh
+mkinitcpio -P
+```
+
+Create a new file modprobe file to enable DRM (Direct Rendering Manager):
+
+`/etc/modprobe.d/nvidia.conf`
+```sh
+options nvidia-drm modeset=1
+```
+
+Enable the suspend/hibernate/resume NVIDIA services:
+
+```sh
+systemctl enable nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service
+```
+
+Reboot the system and confirm nothing explodes.
+
+### ASUS tools
+
+You can install these tools by following official asus-linux [Arch Setup Guide](https://asus-linux.org/guides/arch-guide/)
+or just use an AUR helper and get them from the AUR repos:
+
+```sh
+paru -S asusctl
+```
+
+You can also install `rog-control-center` and `supergfxctl`. I opted not to.
+
+Enable services (`supergfxd` only if you installed `supergfxctl`):
+```sh
+systemctl enable --now power-profiles-daemon supergfxd
+```
+
+Run the following commands to set charge limit and enable Quiet, Performance and Balanced Profiles:
+```sh
+asusctl -c 85 		# Sets charge limit to 85% if you do not want this, do not execute this line
+asusctl fan-curve -m Quiet -f cpu -e true
+asusctl fan-curve -m Quiet -f gpu -e true 
+asusctl fan-curve -m Performance -f cpu -e true
+asusctl fan-curve -m Performance -f gpu -e true
+asusctl fan-curve -m Balanced -f cpu -e true
+asusctl fan-curve -m Balanced -f gpu -e true
+```
+
+Reboot the system and confirm nothing explodes.
+
 ## Install audio and graphical cruft
 
 ### Audio
@@ -399,56 +493,6 @@ You can then add, `exec iio-sway` to the top of your sway config.
 
 ```sh
 pacman -S firefox alacritty imv mpv
-```
-
-## Flow X16 specific customizations
-
-### Intel
-
-Install the `mesa` driver (likely already installed as a dependency of other packages):
-
-```sh
-pacman -S mesa
-```
-
-Enable [GuC/HuC firmware loading](https://wiki.archlinux.org/title/intel_graphics#Enable_GuC_/_HuC_firmware_loading), create the file `/etc/modprobe.d/i915.conf` with contents:
-
-```sh
-/etc/modprobe.d/i915.conf
-```
-
-### Install ASUS tools
-
-You can install these tools by following official asus-linux [Arch Setup Guide](https://asus-linux.org/guides/arch-guide/)
-or just use an AUR helper and get them from the AUR repos:
-
-```sh
-paru -S asusctl
-```
-
-You can also install `rog-control-center` and `supergfxctl`. I didn't.
-
-Enable services (`supergfxd` only if you installs `supergfxctl`):
-```sh
-systemctl enable --now power-profiles-daemon supergfxd
-```
-
-Run the following commands to set charge limit and enable Quiet, Performance and Balanced Profiles:
-```sh
-asusctl -c 85 		# Sets charge limit to 85% if you do not want this, do not execute this line
-asusctl fan-curve -m Quiet -f cpu -e true
-asusctl fan-curve -m Quiet -f gpu -e true 
-asusctl fan-curve -m Performance -f cpu -e true
-asusctl fan-curve -m Performance -f gpu -e true
-asusctl fan-curve -m Balanced -f cpu -e true
-asusctl fan-curve -m Balanced -f gpu -e true
-```
-
-### Nvidia
-Install the following packages
-
-```sh
-sudo pacman -S nvidia-dkms acpi_call
 ```
 
 ## Setup automatic snapshots for pacman
