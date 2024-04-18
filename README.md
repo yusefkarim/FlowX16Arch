@@ -20,6 +20,7 @@
 		- [Install packages](#install-packages)
 		- [Install an AUR helper (paru)](#install-an-aur-helper-paru)
 		- [Create a new user](#create-a-new-user)
+		- [Enable the SSD trim timer service](#enable-the-ssd-trim-timer-service)
 	- [Flow X16 specific customizations](#flow-x16-specific-customizations)
 		- [Intel](#intel)
 		- [NVIDIA](#nvidia)
@@ -339,6 +340,18 @@ Enable root access for the user by running the command below and uncommenting th
 
 ```sh
 EDITOR=nvim visudo
+```
+
+### Enable the SSD trim timer service
+
+Per the Arch Wiki [[ref](https://wiki.archlinux.org/title/Solid_state_drive#TRIM)]:
+
+> The util-linux package provides fstrim.service and fstrim.timer systemd unit files.
+> Enabling the timer will activate the service weekly.
+> The service executes fstrim(8) on all mounted filesystems on devices that support the discard operation. 
+
+```sh
+systemctl enable --now fstrim.timer
 ```
 
 ## Flow X16 specific customizations
