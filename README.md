@@ -12,7 +12,6 @@
 		- [Chroot into the new system and change system and language settings](#chroot-into-the-new-system-and-change-system-and-language-settings)
 		- [Add btrfs and encrypt to initramfs](#add-btrfs-and-encrypt-to-initramfs)
 		- [Install Systemd bootloader](#install-systemd-bootloader)
-		- [Blacklist Nouveau](#blacklist-nouveau)
 		- [Leave chroot and reboot](#leave-chroot-and-reboot)
 	- [Fine-tuning](#fine-tuning)
 		- [Setup networking](#setup-networking)
@@ -24,7 +23,10 @@
 	- [Flow X16 specific customizations](#flow-x16-specific-customizations)
 		- [Intel](#intel)
 		- [NVIDIA](#nvidia)
+			- [Blacklist Nouveau](#blacklist-nouveau)
+			- [Install proprietary NVIDIA drivers](#install-proprietary-nvidia-drivers)
 		- [ASUS tools](#asus-tools)
+		- [NVIDIA troubles? Disable the GPU altogether!](#nvidia-troubles-disable-the-gpu-altogether)
 	- [Install audio and graphical cruft](#install-audio-and-graphical-cruft)
 		- [Audio](#audio)
 			- [Pipewire](#pipewire)
@@ -215,15 +217,6 @@ Finally, copy boot-options with
 echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):luks root=/dev/mapper/luks rootflags=subvol=@ rw" >> /boot/loader/entries/arch.conf
 ```
 
-### Blacklist Nouveau
-
-Edit `/etc/modprobe.d/blacklist-nvidia-nouveau.conf` and add the following:
-
-```
-blacklist nouveau
-options nouveau modeset=0
-```
-
 ### Leave chroot and reboot
 
 Type `exit` to exit chroot and unmount all the volumes using
@@ -306,7 +299,8 @@ pacman -Syu
 
 ```sh
 pacman -S acpid dbus sudo docker openssh picocom rsync pass python-pip rustup git \
-	ttf-dejavu ttf-hack ttf-font-awesome ttf-nerd-fonts-symbols noto-fonts-cjk \
+	ttf-dejavu ttf-hack ttf-font-awesome ttf-nerd-fonts-symbols \
+    noto-fonts-cjk noto-fonts-emoji hunspell-en \
     zip unzip ripgrep wireguard-tools bash-completion
 ```
 
@@ -371,18 +365,22 @@ Enable [GuC/HuC firmware loading](https://wiki.archlinux.org/title/intel_graphic
 ```
 
 ### NVIDIA
+
+#### Blacklist Nouveau
+
+Edit `/etc/modprobe.d/blacklist-nvidia-nouveau.conf` and add the following:
+
+```
+blacklist nouveau
+options nouveau modeset=0
+```
+
+#### Install proprietary NVIDIA drivers
+
 Install the following packages
 
 ```sh
-sudo pacman -S nvidia-dkms acpi_call linux-headers
-```
-
-Add NVIDIA-specific kernel options to systemd-boot:
-
-`/boot/loader/entries/arch.conf`
-```sh
-...
-options ... nvidia_drm.modeset=1 nvidia.NVreg_PreserveVideoMemoryAllocations=1
+sudo pacman -S nvidia-dkms linux-headers
 ```
 
 Add NVIDIA-specific kernel modules to the `MODULES` section of `mkinitcpio.conf`:
@@ -394,17 +392,18 @@ MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 ...
 ```
 
+Create a new file modprobe file with your NVIDIA driver settings, e.g.,:
+
+`/etc/modprobe.d/nvidia.conf`
+```sh
+options nvidia NVreg_UsePageAttributeTable=1 NVreg_EnableStreamMemOPs=1 NVreg_RegistryDwords="PowerMizerEnable=0x1;PerfLevelSrc=0x3333;PowerMizerDefault=0x3;PowerMizerDefaultAC=0x2"
+options nvidia-drm modeset=1 fbdev=1
+```
+
 Generate a new `initrd`:
 
 ```sh
 mkinitcpio -P
-```
-
-Create a new file modprobe file to enable DRM (Direct Rendering Manager):
-
-`/etc/modprobe.d/nvidia.conf`
-```sh
-options nvidia-drm modeset=1
 ```
 
 Enable the suspend/hibernate/resume NVIDIA services:
@@ -440,6 +439,44 @@ asusctl fan-curve -m Performance -f cpu -e true
 asusctl fan-curve -m Performance -f gpu -e true
 asusctl fan-curve -m Balanced -f cpu -e true
 asusctl fan-curve -m Balanced -f gpu -e true
+```
+
+Reboot the system and confirm nothing explodes.
+
+### NVIDIA troubles? Disable the GPU altogether!
+
+The NVIDIA drivers can be frustrating and battery usage with the Nouveau driver is pretty rough. If you don't *really* need your GPU, just disable it altogether.
+
+First uninstall all NVIDIA drivers from above, then create Nouveau black list as mentioned above:
+
+`/etc/modprobe.d/blacklist-nvidia-nouveau.conf`
+```sh
+blacklist nouveau
+options nouveau modeset=0
+```
+
+You can also blacklist NVIDIA drivers too:
+
+`/etc/modprobe.d/blacklist-nvidia.conf`
+```sh
+blacklist nvidia nvidia-drm
+```
+
+Finally, create a udev rules to remove NVIDIA devices:
+
+`/etc/udev/rules.d/00-remove-nvidia.rules`
+```sh
+# Remove NVIDIA USB xHCI Host Controller devices, if present
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", ATTR{power/control}="auto", ATTR{remove}="1"
+
+# Remove NVIDIA USB Type-C UCSI devices, if present
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c8000", ATTR{power/control}="auto", ATTR{remove}="1"
+
+# Remove NVIDIA Audio devices, if present
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", ATTR{power/control}="auto", ATTR{remove}="1"
+
+# Remove NVIDIA VGA/3D controller devices
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x03[0-9]*", ATTR{power/control}="auto", ATTR{remove}="1"
 ```
 
 Reboot the system and confirm nothing explodes.
